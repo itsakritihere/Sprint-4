@@ -5,6 +5,7 @@ function App() {
   const [resumeFile, setResumeFile] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
   const [coverLetter, setCoverLetter] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -29,7 +30,7 @@ function App() {
     setResumeFile(file);
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!resumeFile) {
       alert("Please upload your resume.");
       return;
@@ -39,8 +40,46 @@ function App() {
       alert("Please enter the job description.");
       return;
     }
-    console.log("Resume:", resumeFile);
-    console.log("Job Description:", jobDescription);
+
+    try {
+      setLoading(true);
+      setCoverLetter("");
+
+      const formData = new FormData();
+
+      formData.append("resume", resumeFile);
+      formData.append("jobDescription", jobDescription);
+
+      console.log("Sending request to backend...");
+
+      const response = await fetch(
+        "http://localhost:5000/api/generate",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      console.log("Backend response status:", response.status);
+
+      const data = await response.json();
+
+      console.log("Backend response:", data);
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to generate cover letter."
+        );
+      }
+
+      setCoverLetter(data.coverLetter);
+
+    } catch (error) {
+      console.error("Generate error:", error);
+      alert(error.message || "Connection error.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,7 +90,8 @@ function App() {
 
         <h1>
           Create Your Perfect
-          <span> Cover Letter</span>
+          <br />
+          Cover Letter
         </h1>
 
         <p>
@@ -63,16 +103,19 @@ function App() {
       <section className="generator-container">
 
         {/* LEFT SIDE */}
+
         <div className="input-section">
 
           <div className="section-heading">
             <h2>Your Details</h2>
+
             <p>
-              Upload your resume and add the target job description.
+              Upload your resume and add the job description.
             </p>
           </div>
 
           {/* Resume Upload */}
+
           <div className="input-group">
 
             <label>Your Resume</label>
@@ -106,10 +149,10 @@ function App() {
               </span>
 
             </label>
-
           </div>
 
           {/* Job Description */}
+
           <div className="input-group">
 
             <label>Target Job Description</label>
@@ -117,42 +160,71 @@ function App() {
             <textarea
               placeholder="Paste the job description here..."
               value={jobDescription}
-              onChange={(e) =>
-                setJobDescription(e.target.value)
-              }
+              onChange={(e) => setJobDescription(e.target.value)}
             />
 
           </div>
 
+          {/* Generate Button */}
+
           <button
             className="generate-btn"
             onClick={handleGenerate}
+            disabled={loading}
           >
-            ✨ Generate Cover Letter
+            {loading
+              ? "Generating..."
+              : "✨ Generate Cover Letter"}
           </button>
 
         </div>
 
         {/* RIGHT SIDE */}
+
         <div className="output-section">
 
           <div className="section-heading">
+
             <h2>Your Cover Letter</h2>
+
             <p>
               Your AI-generated cover letter will appear here.
             </p>
+
           </div>
 
           <div className="cover-letter-box">
 
-            {coverLetter ? (
-              <p>{coverLetter}</p>
+            {loading ? (
+
+              <div className="empty-state">
+                <span>✨</span>
+
+                <h3>
+                  Generating...
+                </h3>
+
+                <p>
+                  AI is analyzing your resume and job
+                  description.
+                </p>
+              </div>
+
+            ) : coverLetter ? (
+
+              <div className="cover-letter-content">
+                <p>{coverLetter}</p>
+              </div>
+
             ) : (
+
               <div className="empty-state">
 
                 <span>✦</span>
 
-                <h3>Ready to Create</h3>
+                <h3>
+                  Ready to Create
+                </h3>
 
                 <p>
                   Upload your resume and enter a job
@@ -161,6 +233,7 @@ function App() {
                 </p>
 
               </div>
+
             )}
 
           </div>

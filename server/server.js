@@ -2,15 +2,19 @@ import express from "express";
 import multer from "multer";
 import cors from "cors";
 import dotenv from "dotenv";
-import extractResumeText from "./services/resumeParse.js";
+
+import  extractResumeText  from "./services/resumeParse.js";
+import { generateCoverLetter } from "./services/llmServices.js";
 
 dotenv.config();
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// File upload configuration
 const upload = multer({
   dest: "uploads/",
   limits: {
@@ -30,42 +34,62 @@ const upload = multer({
   },
 });
 
-app.post("/api/generate", upload.single("resume"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        error: "Resume file is required.",
-      });
-    }
-
-    const { jobDescription } = req.body;
-
-    if (!jobDescription?.trim()) {
-      return res.status(400).json({
-        error: "Job description is required.",
-      });
-    }
-
-    const resumeText = await extractResumeText(req.file);
-
-    console.log("Resume extracted successfully.");
-
-    res.json({
-      success: true,
-      message: "Resume processed successfully.",
-      resumeText,
-      jobDescription,
-    });
-
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Failed to process resume.",
-    });
-  }
+// Test route
+app.get("/", (req, res) => {
+  res.send("AI Cover Letter API is running");
 });
 
+// Generate cover letter
+app.post(
+  "/api/generate",
+  upload.single("resume"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          error: "Resume file is required.",
+        });
+      }
+
+      const { jobDescription } = req.body;
+
+      if (!jobDescription || !jobDescription.trim()) {
+        return res.status(400).json({
+          error: "Job description is required.",
+        });
+      }
+
+      console.log("Processing resume...");
+
+      const resumeText = await extractResumeText(req.file);
+
+      console.log("Resume extracted successfully.");
+
+      console.log("Generating cover letter...");
+
+      const coverLetter = await generateCoverLetter(
+        resumeText,
+        jobDescription
+      );
+
+      console.log("Cover letter generated successfully.");
+
+      res.json({
+        success: true,
+        coverLetter,
+      });
+
+    } catch (error) {
+      console.error("Generation error:", error);
+
+      res.status(500).json({
+        error: error.message || "Failed to generate cover letter.",
+      });
+    }
+  }
+);
+
+// Start server
 const PORT = 5000;
 
 app.listen(PORT, () => {
