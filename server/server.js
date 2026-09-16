@@ -17,22 +17,17 @@ app.use(cors());
 app.use(express.json());
 
 
-// ================================
-// MULTER CONFIGURATION
-// ================================
 
 const upload = multer({
   dest: "uploads/",
 
   limits: {
-    fileSize: 5 * 1024 * 1024,
-  },
+    fileSize: 5 * 1024 * 1024, },
 
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ];
 
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
@@ -43,18 +38,12 @@ const upload = multer({
 });
 
 
-// ================================
-// HOME ROUTE
-// ================================
-
 app.get("/", (req, res) => {
   res.send("AI Cover Letter API is running");
 });
 
 
-// ================================
-// GENERATE COVER LETTER - STREAMING
-// ================================
+
 
 app.post(
   "/api/generate",
@@ -62,9 +51,6 @@ app.post(
   async (req, res) => {
     try {
 
-      // ----------------------------
-      // Check resume
-      // ----------------------------
 
       if (!req.file) {
         return res.status(400).json({
@@ -72,10 +58,6 @@ app.post(
         });
       }
 
-
-      // ----------------------------
-      // Check job description
-      // ----------------------------
 
       const { jobDescription } = req.body;
 
@@ -86,9 +68,6 @@ app.post(
       }
 
 
-      // ----------------------------
-      // Extract resume text
-      // ----------------------------
 
       console.log("Processing resume...");
 
@@ -97,18 +76,6 @@ app.post(
       console.log("Resume extracted successfully.");
 
       console.log("Starting Gemini streaming...");
-
-
-      // ============================
-      // STREAM RESPONSE HEADERS
-      // ============================
-      //
-      // NOTE: these are only buffered until the first res.write()/
-      // res.flushHeaders() call, so a 429 raised *before* any text
-      // has been generated (see llmServices' backoff wrapper) can
-      // still be reported as a clean JSON error below — the client
-      // never sees a half-open stream for a request that ultimately
-      // failed before producing any content.
 
       res.setHeader(
         "Content-Type",
@@ -141,25 +108,18 @@ app.post(
 
         (textChunk) => {
 
-          // Flush headers on the very first chunk so the browser
-          // starts receiving bytes immediately (Fetch Streams API
-          // on the frontend reads these as they arrive).
-
+   
           if (!res.headersSent) {
             res.flushHeaders();
           }
 
-          // Send every Gemini chunk
-          // immediately to React
+  
 
           res.write(textChunk);
         }
       );
 
 
-      // ----------------------------
-      // Finish response
-      // ----------------------------
 
       console.log("Streaming completed.");
 
@@ -171,16 +131,6 @@ app.post(
         "Generation error:",
         error
       );
-
-
-      // ============================
-      // QUOTA ERROR
-      // ============================
-      //
-      // By the time we get here, generateCoverLetterStream has
-      // already exhausted its exponential-backoff retries (or the
-      // error happened mid-stream). Either way, if headers were
-      // never flushed we can still return a clean 429 JSON error.
 
       const rawMessage =
         typeof error?.message === "string"
@@ -205,10 +155,6 @@ app.post(
       }
 
 
-      // ============================
-      // OTHER ERROR
-      // ============================
-
       if (!res.headersSent) {
 
         return res.status(500).json({
@@ -219,19 +165,13 @@ app.post(
 
       }
 
-
-      // Headers already sent,
-      // so just close the stream.
-
       res.end();
     }
   }
 );
 
 
-// ================================
-// ERROR HANDLER
-// ================================
+
 
 app.use((error, req, res, next) => {
 
@@ -253,7 +193,7 @@ app.use((error, req, res, next) => {
 
 // ================================
 // START SERVER
-// ================================
+
 
 const PORT = 5000;
 

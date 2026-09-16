@@ -12,8 +12,6 @@ function App() {
   const [coverLetter, setCoverLetter] =
     useState("");
 
-  // "loading" = request sent, waiting for the first byte back.
-  // "isStreaming" = bytes are actively arriving and being rendered.
   const [loading, setLoading] =
     useState(false);
 
@@ -110,7 +108,7 @@ function App() {
           message =
             errData.error || message;
         } catch {
-          // response wasn't valid JSON; fall back to default message
+          // response wasn't valid JSON; so fall back to default message
         }
 
         throw new Error(message);
@@ -122,12 +120,6 @@ function App() {
         );
       }
 
-      // ----------------------------
-      // Fetch Streams API: read the
-      // response body chunk by chunk
-      // and render markdown as it
-      // arrives, word by word.
-      // ----------------------------
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -246,7 +238,7 @@ function App() {
 
           </div>
 
-          {/* Resume Upload */}
+          {/* Resume Upload... */}
 
           <div className="input-group">
 
@@ -292,7 +284,7 @@ function App() {
 
           </div>
 
-          {/* Job Description */}
+          {/* Job Description.... */}
 
           <div className="input-group">
 
@@ -312,7 +304,7 @@ function App() {
 
           </div>
 
-          {/* Generate Button */}
+          {/* Generate Button..... */}
 
           <button
             className="generate-btn"
@@ -369,6 +361,21 @@ function App() {
             ) : coverLetter ? (
 
               <div className="cover-letter-content">
+                {/* Copy button only once
+                    streaming has finished */}
+
+                {!isStreaming && (
+                  <button
+                    className="copy-btn"
+                    onClick={
+                      handleCopy
+                    }
+                  >
+                    {copied
+                      ? "✓ Copied!"
+                      : "📋 Copy to Clipboard"}
+                  </button>
+                )}
 
                 {/* Markdown → HTML, re-parsed on every
                     chunk so the letter renders live */}
@@ -388,21 +395,7 @@ function App() {
                   </span>
                 )}
 
-                {/* Copy button only once
-                    streaming has finished */}
-
-                {!isStreaming && (
-                  <button
-                    className="copy-btn"
-                    onClick={
-                      handleCopy
-                    }
-                  >
-                    {copied
-                      ? "✓ Copied!"
-                      : "📋 Copy to Clipboard"}
-                  </button>
-                )}
+                
 
               </div>
 

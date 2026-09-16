@@ -63,9 +63,7 @@ Write the complete cover letter now, following all system instructions exactly.
 `;
 }
 
-// ================================
-// RATE LIMIT (429) DETECTION
-// ================================
+// RATE LIMIT (429) DETECTion
 
 function isQuotaError(error) {
   const rawMessage =
@@ -91,10 +89,8 @@ function sleep(ms) {
 
 // ================================
 // EXPONENTIAL BACKOFF WRAPPER
-// ================================
-//
-// Retries `fn` when it throws an error that `shouldRetry` accepts.
-// Delay doubles each attempt (with jitter) up to `maxDelay`.
+
+
 
 async function withExponentialBackoff(
   fn,
@@ -129,17 +125,7 @@ async function withExponentialBackoff(
   }
 }
 
-/*
-  Streaming Gemini response, with automatic retry-on-429.
 
-  onChunk() is called every time Gemini sends another piece of
-  generated text.
-
-  Retries only apply BEFORE the first chunk has been streamed back
-  to the caller. Once text has started flowing to the client we
-  can no longer safely restart the request (it would duplicate
-  content), so a 429 that happens mid-stream is just thrown.
-*/
 export async function generateCoverLetterStream(
   resumeText,
   jobDescription,
@@ -183,8 +169,7 @@ export async function generateCoverLetterStream(
       maxRetries: 5,
       baseDelay: 1000,
       maxDelay: 20000,
-      // Only retry quota errors, and only if we haven't already
-      // started streaming content back to the client.
+      
       shouldRetry: (error) => !streamingStarted && isQuotaError(error),
       onRetry: ({ attempt, delay }) => {
         console.warn(
