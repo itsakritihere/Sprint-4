@@ -26,14 +26,15 @@ export default async function extractResumeText(file) {
     }
 
     if (extension === "docx") {
-      const result = await mammoth.extractRawText({
-        path: filePath,
-      });
+      const result =
+        await mammoth.extractRawText({
+          path: filePath,
+        });
 
       return result.value;
     }
 
-    throw new Error("Unsupported file type");
+    throw new Error("Unsupported file type.");
   } finally {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);

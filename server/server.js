@@ -80,12 +80,31 @@ app.post(
       });
 
     } catch (error) {
-      console.error("Generation error:", error);
+  console.error("Generation error:", error);
 
-      res.status(500).json({
-        error: error.message || "Failed to generate cover letter.",
-      });
-    }
+  const message = error?.message || "";
+  const lowerMessage = message.toLowerCase();
+
+  const isQuotaError =
+    error?.code === 429 ||
+    error?.status === 429 ||
+    lowerMessage.includes("quota exceeded") ||
+    lowerMessage.includes("resource_exhausted") ||
+    lowerMessage.includes("generate_content_free_tier_requests");
+
+  if (isQuotaError) {
+    return res.status(429).json({
+      error:
+        "Gemini API quota exceeded. Please wait for the quota to reset or check your Gemini API limits.",
+    });
+  }
+
+  return res.status(500).json({
+    error:
+      message ||
+      "Failed to generate cover letter.",
+  });
+}
   }
 );
 

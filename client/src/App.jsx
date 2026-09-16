@@ -1,11 +1,22 @@
 import { useState } from "react";
+import { marked } from "marked";
 import "./App.css";
 
 function App() {
-  const [resumeFile, setResumeFile] = useState(null);
-  const [jobDescription, setJobDescription] = useState("");
-  const [coverLetter, setCoverLetter] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [resumeFile, setResumeFile] =
+    useState(null);
+
+  const [jobDescription, setJobDescription] =
+    useState("");
+
+  const [coverLetter, setCoverLetter] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [copied, setCopied] =
+    useState(false);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -18,12 +29,16 @@ function App() {
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      alert("Please upload a PDF or DOCX file.");
+      alert(
+        "Please upload a PDF or DOCX file."
+      );
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("File size must be less than 5 MB.");
+      alert(
+        "File size must be less than 5 MB."
+      );
       return;
     }
 
@@ -37,20 +52,32 @@ function App() {
     }
 
     if (!jobDescription.trim()) {
-      alert("Please enter the job description.");
+      alert(
+        "Please enter the job description."
+      );
       return;
     }
 
     try {
       setLoading(true);
       setCoverLetter("");
+      setCopied(false);
 
       const formData = new FormData();
 
-      formData.append("resume", resumeFile);
-      formData.append("jobDescription", jobDescription);
+      formData.append(
+        "resume",
+        resumeFile
+      );
 
-      console.log("Sending request to backend...");
+      formData.append(
+        "jobDescription",
+        jobDescription
+      );
+
+      console.log(
+        "Sending request to backend..."
+      );
 
       const response = await fetch(
         "http://localhost:5000/api/generate",
@@ -60,25 +87,67 @@ function App() {
         }
       );
 
-      console.log("Backend response status:", response.status);
+      const data =
+        await response.json();
 
-      const data = await response.json();
+      console.log(
+        "Backend response:",
+        data
+      );
+        if (!response.ok) {
+  if (response.status === 429) {
+    throw new Error(
+      "Gemini API quota exceeded. Please wait for the quota to reset and try again."
+    );
+  }
 
-      console.log("Backend response:", data);
+  throw new Error(
+    data.error ||
+      "Failed to generate cover letter."
+  );
+}
+    
 
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Failed to generate cover letter."
-        );
-      }
-
-      setCoverLetter(data.coverLetter);
-
+      setCoverLetter(
+        data.coverLetter
+      );
     } catch (error) {
-      console.error("Generate error:", error);
-      alert(error.message || "Connection error.");
+      console.error(
+        "Generate error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Connection error."
+      );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!coverLetter) return;
+
+    try {
+      await navigator.clipboard.writeText(
+        coverLetter
+      );
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error(
+        "Copy failed:",
+        error
+      );
+
+      alert(
+        "Failed to copy cover letter."
+      );
     }
   };
 
@@ -86,7 +155,10 @@ function App() {
     <main className="app">
 
       <section className="hero">
-        <span className="badge">AI POWERED</span>
+
+        <span className="badge">
+          AI POWERED
+        </span>
 
         <h1>
           Create Your Perfect
@@ -95,9 +167,11 @@ function App() {
         </h1>
 
         <p>
-          Upload your resume and provide a job description
-          to generate a personalized cover letter.
+          Upload your resume and provide
+          a job description to generate a
+          personalized cover letter.
         </p>
+
       </section>
 
       <section className="generator-container">
@@ -107,25 +181,32 @@ function App() {
         <div className="input-section">
 
           <div className="section-heading">
+
             <h2>Your Details</h2>
 
             <p>
-              Upload your resume and add the job description.
+              Upload your resume and add
+              the job description.
             </p>
+
           </div>
 
           {/* Resume Upload */}
 
           <div className="input-group">
 
-            <label>Your Resume</label>
+            <label>
+              Your Resume
+            </label>
 
             <label className="upload-box">
 
               <input
                 type="file"
                 accept=".pdf,.docx"
-                onChange={handleFileChange}
+                onChange={
+                  handleFileChange
+                }
               />
 
               <div className="upload-icon">
@@ -140,7 +221,11 @@ function App() {
 
               <p>
                 {resumeFile
-                  ? `${(resumeFile.size / 1024 / 1024).toFixed(2)} MB`
+                  ? `${(
+                      resumeFile.size /
+                      1024 /
+                      1024
+                    ).toFixed(2)} MB`
                   : "PDF or DOCX • Maximum 5 MB"}
               </p>
 
@@ -149,18 +234,25 @@ function App() {
               </span>
 
             </label>
+
           </div>
 
           {/* Job Description */}
 
           <div className="input-group">
 
-            <label>Target Job Description</label>
+            <label>
+              Target Job Description
+            </label>
 
             <textarea
               placeholder="Paste the job description here..."
               value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
+              onChange={(e) =>
+                setJobDescription(
+                  e.target.value
+                )
+              }
             />
 
           </div>
@@ -185,10 +277,13 @@ function App() {
 
           <div className="section-heading">
 
-            <h2>Your Cover Letter</h2>
+            <h2>
+              Your Cover Letter
+            </h2>
 
             <p>
-              Your AI-generated cover letter will appear here.
+              Your AI-generated cover
+              letter will appear here.
             </p>
 
           </div>
@@ -198,6 +293,7 @@ function App() {
             {loading ? (
 
               <div className="empty-state">
+
                 <span>✨</span>
 
                 <h3>
@@ -205,15 +301,41 @@ function App() {
                 </h3>
 
                 <p>
-                  AI is analyzing your resume and job
+                  AI is analyzing your
+                  resume and job
                   description.
                 </p>
+
               </div>
 
             ) : coverLetter ? (
 
               <div className="cover-letter-content">
-                <p>{coverLetter}</p>
+
+                {/* Markdown → HTML */}
+
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      marked.parse(
+                        coverLetter
+                      ),
+                  }}
+                />
+
+                {/* Copy button */}
+
+                <button
+                  className="copy-btn"
+                  onClick={
+                    handleCopy
+                  }
+                >
+                  {copied
+                    ? "✓ Copied!"
+                    : "📋 Copy to Clipboard"}
+                </button>
+
               </div>
 
             ) : (
@@ -227,9 +349,10 @@ function App() {
                 </h3>
 
                 <p>
-                  Upload your resume and enter a job
-                  description to generate your personalized
-                  cover letter.
+                  Upload your resume and
+                  enter a job description
+                  to generate your
+                  personalized cover letter.
                 </p>
 
               </div>
