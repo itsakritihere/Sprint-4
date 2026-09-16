@@ -28,8 +28,9 @@ Write a complete, personalized cover letter using ONLY:
 
 IMPORTANT RULES:
 - Output ONLY the final cover letter.
+- No analysis or reasoning.
 - Do not invent skills, experience, projects, companies, achievements, or technologies.
-- Pull 2-3 specific details from the resume and connect them directly to the job description.
+- Pull 2-3 SPECIFIC details from the resume and connect them directly to requirements in the job description.
 - Avoid generic filler.
 - Vary sentence length.
 - Avoid starting multiple sentences with "I".
@@ -37,13 +38,13 @@ IMPORTANT RULES:
 - The final answer MUST be between 250 and 350 words.
 - Use a confident, professional, natural tone.
 - Start directly with the salutation/opening line.
-- End with a professional sign-off followed by the candidate's name.
+- End with a professional sign-off followed by the candidate's name from the resume.
 
 STRUCTURE:
-1. Opening paragraph — role + strong specific hook.
-2. Relevant experience and skills.
+1. Opening paragraph — role being applied for + strong specific hook.
+2. Relevant experience and skills — grounded in real resume details.
 3. Why the candidate is a good fit.
-4. Closing paragraph + sign-off.
+4. Closing paragraph — brief call to action and professional sign-off.
 
 Return ONLY the complete cover letter text.
 `;
@@ -62,42 +63,105 @@ Write the complete cover letter now, following all system instructions exactly.
 `;
 }
 
+// ================================
+// RATE LIMIT (429) DETECTION
+// ================================
+
+function isQuotaError(error) {
+  const rawMessage =
+    typeof error?.message === "string"
+      ? error.message
+      : JSON.stringify(error);
+
+  const lowerMessage = rawMessage.toLowerCase();
+
+  return (
+    error?.code === 429 ||
+    error?.status === 429 ||
+    lowerMessage.includes('"code":429') ||
+    lowerMessage.includes("resource_exhausted") ||
+    lowerMessage.includes("quota exceeded") ||
+    lowerMessage.includes("generate_content_free_tier_requests")
+  );
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Only retry temporary server overload/unavailability.
-// Do NOT retry quota-exceeded 429 errors.
-function isRetryableApiError(error) {
-  const code = error?.code || error?.status || error?.response?.status;
-  const message = (error?.message || "").toLowerCase();
+// ================================
+// EXPONENTIAL BACKOFF WRAPPER
+// ================================
+//
+// Retries `fn` when it throws an error that `shouldRetry` accepts.
+// Delay doubles each attempt (with jitter) up to `maxDelay`.
 
-  return (
-    code === 503 ||
-    message.includes("unavailable") ||
-    message.includes("overloaded") ||
-    message.includes("high demand")
-  );
+async function withExponentialBackoff(
+  fn,
+  {
+    maxRetries = 5,
+    baseDelay = 1000,
+    maxDelay = 20000,
+    shouldRetry = () => true,
+    onRetry = () => {},
+  } = {}
+) {
+  let attempt = 0;
+
+  while (true) {
+    try {
+      return await fn();
+    } catch (error) {
+      attempt += 1;
+
+      if (attempt > maxRetries || !shouldRetry(error)) {
+        throw error;
+      }
+
+      const jitter = Math.random() * 250;
+      const delay =
+        Math.min(maxDelay, baseDelay * 2 ** (attempt - 1)) + jitter;
+
+      onRetry({ attempt, delay, error });
+
+      await sleep(delay);
+    }
+  }
 }
 
-async function callGeminiWithBackoff(
-  prompt,
-  maxOutputTokens,
-  maxRetries = 3
-) {
-  let delay = 1000;
+/*
+  Streaming Gemini response, with automatic retry-on-429.
 
-  for (let i = 0; i <= maxRetries; i++) {
-    try {
-      const response = await ai.models.generateContent({
+  onChunk() is called every time Gemini sends another piece of
+  generated text.
+
+  Retries only apply BEFORE the first chunk has been streamed back
+  to the caller. Once text has started flowing to the client we
+  can no longer safely restart the request (it would duplicate
+  content), so a 429 that happens mid-stream is just thrown.
+*/
+export async function generateCoverLetterStream(
+  resumeText,
+  jobDescription,
+  onChunk
+) {
+  const prompt = buildPrompt(resumeText, jobDescription);
+
+  let streamingStarted = false;
+
+  await withExponentialBackoff(
+    async () => {
+      const response = await ai.models.generateContentStream({
         model: "gemini-3.6-flash",
 
         contents: prompt,
 
         config: {
           systemInstruction: SYSTEM_PROMPT,
+
           temperature: 0.6,
-          maxOutputTokens,
+
+          maxOutputTokens: 4096,
 
           thinkingConfig: {
             thinkingLevel: "low",
@@ -105,142 +169,32 @@ async function callGeminiWithBackoff(
         },
       });
 
-      const candidate = response.candidates?.[0];
-      const finishReason = candidate?.finishReason;
+      for await (const chunk of response) {
+        streamingStarted = true;
 
-      const usage = response.usageMetadata;
+        const text = chunk.text;
 
-      console.log("Finish reason:", finishReason);
-
-      console.log(
-        "Tokens — thoughts:",
-        usage?.thoughtsTokenCount,
-        "| output:",
-        usage?.candidatesTokenCount
-      );
-
-      const text = response.text?.trim();
-
-      return {
-        text,
-        finishReason,
-      };
-    } catch (error) {
-      const retryable = isRetryableApiError(error);
-
-      // Quota errors should NOT be retried.
-      if (!retryable || i === maxRetries) {
-        throw error;
+        if (text) {
+          onChunk(text);
+        }
       }
-
-      console.warn(
-        `Gemini unavailable (attempt ${i + 1}/${maxRetries + 1}). ` +
-          `Retrying in ${delay}ms...`
-      );
-
-      await sleep(delay);
-
-      delay *= 2;
-    }
-  }
-}
-
-export async function generateCoverLetter(
-  resumeText,
-  jobDescription
-) {
-  const prompt = buildPrompt(
-    resumeText,
-    jobDescription
-  );
-
-  const MAX_ATTEMPTS = 3;
-
-  let lastText = null;
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const maxOutputTokens = 2048 + attempt * 1024;
-
-    try {
-      const { text, finishReason } =
-        await callGeminiWithBackoff(
-          prompt,
-          maxOutputTokens
-        );
-
-      if (!text) {
+    },
+    {
+      maxRetries: 5,
+      baseDelay: 1000,
+      maxDelay: 20000,
+      // Only retry quota errors, and only if we haven't already
+      // started streaming content back to the client.
+      shouldRetry: (error) => !streamingStarted && isQuotaError(error),
+      onRetry: ({ attempt, delay }) => {
         console.warn(
-          `Attempt ${attempt}: empty response`
+          `Gemini rate limited (429). Retry ${attempt}/5 in ${Math.round(
+            delay
+          )}ms...`
         );
-
-        continue;
-      }
-
-      lastText = text;
-
-      const wordCount = text
-        .split(/\s+/)
-        .filter(Boolean)
-        .length;
-
-      console.log(
-        `Attempt ${attempt}: ${wordCount} words, finishReason=${finishReason}`
-      );
-
-      const truncated =
-        finishReason === "MAX_TOKENS";
-
-      const wrongLength =
-        wordCount < 250 || wordCount > 350;
-
-      if (!truncated && !wrongLength) {
-        return text;
-      }
-
-      console.warn(
-        `Attempt ${attempt} rejected. ` +
-          `truncated=${truncated}, wrongLength=${wrongLength}`
-      );
-    } catch (error) {
-      console.error(
-        `Attempt ${attempt} error:`,
-        error
-      );
-
-      // Immediately stop on quota errors.
-      const message =
-        error?.message?.toLowerCase() || "";
-
-      const isQuotaError =
-        error?.code === 429 ||
-        error?.status === 429 ||
-        message.includes("quota") ||
-        message.includes("resource_exhausted");
-
-      if (isQuotaError) {
-        throw new Error(
-          "Gemini API quota exceeded. Please wait for the quota to reset or check your Gemini API billing/limits."
-        );
-      }
-
-      if (attempt === MAX_ATTEMPTS) {
-        throw new Error(
-          error?.message ||
-            "Failed to generate cover letter."
-        );
-      }
+      },
     }
-  }
-
-  if (lastText) {
-    console.warn(
-      "Returning best-effort result after max attempts."
-    );
-
-    return lastText;
-  }
-
-  throw new Error(
-    "Gemini returned an empty response."
   );
 }
+
+export { isQuotaError };

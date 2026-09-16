@@ -12,7 +12,12 @@ function App() {
   const [coverLetter, setCoverLetter] =
     useState("");
 
+  // "loading" = request sent, waiting for the first byte back.
+  // "isStreaming" = bytes are actively arriving and being rendered.
   const [loading, setLoading] =
+    useState(false);
+
+  const [isStreaming, setIsStreaming] =
     useState(false);
 
   const [copied, setCopied] =
@@ -60,6 +65,7 @@ function App() {
 
     try {
       setLoading(true);
+      setIsStreaming(false);
       setCoverLetter("");
       setCopied(false);
 
@@ -87,30 +93,78 @@ function App() {
         }
       );
 
-      const data =
-        await response.json();
+      // ----------------------------
+      // Error responses (400/429/500)
+      // are plain JSON, not a stream.
+      // ----------------------------
 
-      console.log(
-        "Backend response:",
-        data
-      );
-        if (!response.ok) {
-  if (response.status === 429) {
-    throw new Error(
-      "Gemini API quota exceeded. Please wait for the quota to reset and try again."
-    );
-  }
+      if (!response.ok) {
+        let message =
+          response.status === 429
+            ? "Gemini is rate-limited right now. We retried automatically but it's still busy — please try again shortly."
+            : "Failed to generate cover letter.";
 
-  throw new Error(
-    data.error ||
-      "Failed to generate cover letter."
-  );
-}
-    
+        try {
+          const errData =
+            await response.json();
+          message =
+            errData.error || message;
+        } catch {
+          // response wasn't valid JSON; fall back to default message
+        }
 
-      setCoverLetter(
-        data.coverLetter
-      );
+        throw new Error(message);
+      }
+
+      if (!response.body) {
+        throw new Error(
+          "Streaming is not supported in this browser."
+        );
+      }
+
+      // ----------------------------
+      // Fetch Streams API: read the
+      // response body chunk by chunk
+      // and render markdown as it
+      // arrives, word by word.
+      // ----------------------------
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      let accumulated = "";
+      let receivedFirstChunk = false;
+
+      while (true) {
+        const { value, done } =
+          await reader.read();
+
+        if (done) break;
+
+        const chunkText = decoder.decode(
+          value,
+          { stream: true }
+        );
+
+        if (!chunkText) continue;
+
+        if (!receivedFirstChunk) {
+          receivedFirstChunk = true;
+          setLoading(false);
+          setIsStreaming(true);
+        }
+
+        accumulated += chunkText;
+
+        setCoverLetter(accumulated);
+      }
+
+      if (!receivedFirstChunk) {
+        // Stream closed without ever sending text.
+        throw new Error(
+          "No response was generated. Please try again."
+        );
+      }
     } catch (error) {
       console.error(
         "Generate error:",
@@ -123,6 +177,7 @@ function App() {
       );
     } finally {
       setLoading(false);
+      setIsStreaming(false);
     }
   };
 
@@ -262,9 +317,11 @@ function App() {
           <button
             className="generate-btn"
             onClick={handleGenerate}
-            disabled={loading}
+            disabled={loading || isStreaming}
           >
             {loading
+              ? "Starting..."
+              : isStreaming
               ? "Generating..."
               : "✨ Generate Cover Letter"}
           </button>
@@ -297,13 +354,14 @@ function App() {
                 <span>✨</span>
 
                 <h3>
-                  Generating...
+                  Connecting...
                 </h3>
 
                 <p>
-                  AI is analyzing your
-                  resume and job
-                  description.
+                  Reaching out to the AI
+                  model (automatically
+                  retries if it's briefly
+                  rate-limited).
                 </p>
 
               </div>
@@ -312,7 +370,8 @@ function App() {
 
               <div className="cover-letter-content">
 
-                {/* Markdown → HTML */}
+                {/* Markdown → HTML, re-parsed on every
+                    chunk so the letter renders live */}
 
                 <div
                   dangerouslySetInnerHTML={{
@@ -323,18 +382,27 @@ function App() {
                   }}
                 />
 
-                {/* Copy button */}
+                {isStreaming && (
+                  <span className="cursor">
+                    ▍
+                  </span>
+                )}
 
-                <button
-                  className="copy-btn"
-                  onClick={
-                    handleCopy
-                  }
-                >
-                  {copied
-                    ? "✓ Copied!"
-                    : "📋 Copy to Clipboard"}
-                </button>
+                {/* Copy button only once
+                    streaming has finished */}
+
+                {!isStreaming && (
+                  <button
+                    className="copy-btn"
+                    onClick={
+                      handleCopy
+                    }
+                  >
+                    {copied
+                      ? "✓ Copied!"
+                      : "📋 Copy to Clipboard"}
+                  </button>
+                )}
 
               </div>
 
