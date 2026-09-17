@@ -66,7 +66,7 @@ function App() {
       );
 
       const response = await fetch(
-        "http://localhost:5000/api/generate",
+        "https://sprint-4-pk8l.onrender.com/",
         {
           method: "POST",
           body: formData,
@@ -165,7 +165,7 @@ function App() {
       }, 2000);
     } catch (error) {
       console.error(
-        "Copy it failed:",
+        "Copy failed:",
         error
       );
 
