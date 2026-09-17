@@ -66,7 +66,7 @@ function App() {
       );
 
       const response = await fetch(
-        "https://sprint-4-pk8l.onrender.com/",
+        "api/generate-cover-letter/api/generate",
         {
           method: "POST",
           body: formData,
