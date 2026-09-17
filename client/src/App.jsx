@@ -77,7 +77,7 @@ function App() {
       if (!response.ok) {
         let message =
           response.status === 429
-            ? "Gemini is rate-limited right now. We retried automatically but it's still busy — please try again shortly."
+            ? "Gemini is rate-limited right now. We retried automatically but it's still busy ,please try again shortly."
             : "Failed to generate cover letter.";
 
         try {
@@ -97,7 +97,6 @@ function App() {
           "Streaming is not supported in this browser."
         );
       }
-
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -166,7 +165,7 @@ function App() {
       }, 2000);
     } catch (error) {
       console.error(
-        "Copy failed:",
+        "Copy it failed:",
         error
       );
 
