@@ -3,23 +3,13 @@ import { marked } from "marked";
 import "./App.css";
 
 function App() {
-  const [resumeFile, setResumeFile] =
-    useState(null);
+  const [resumeFile, setResumeFile] = useState(null);
 
-  const [jobDescription, setJobDescription] =
-    useState("");
-
-  const [coverLetter, setCoverLetter] =
-    useState("");
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [isStreaming, setIsStreaming] =
-    useState(false);
-
-  const [copied, setCopied] =
-    useState(false);
+  const [jobDescription, setJobDescription] = useState("");
+  const [coverLetter, setCoverLetter] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isStreaming, setIsStreaming] =useState(false);
+  const [copied, setCopied] =useState(false);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -28,8 +18,7 @@ function App() {
 
     const allowedTypes = [
       "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",];
 
     if (!allowedTypes.includes(file.type)) {
       alert(
@@ -66,21 +55,14 @@ function App() {
       setIsStreaming(false);
       setCoverLetter("");
       setCopied(false);
+     const formData = new FormData();
 
-      const formData = new FormData();
+      formData.append( "resume", resumeFile );
 
-      formData.append(
-        "resume",
-        resumeFile
-      );
-
-      formData.append(
-        "jobDescription",
-        jobDescription
-      );
+      formData.append( "jobDescription", jobDescription);
 
       console.log(
-        "Sending request to backend..."
+        "We are sending request to backend..."
       );
 
       const response = await fetch(
@@ -91,10 +73,6 @@ function App() {
         }
       );
 
-      // ----------------------------
-      // Error responses (400/429/500)
-      // are plain JSON, not a stream.
-      // ----------------------------
 
       if (!response.ok) {
         let message =
@@ -361,24 +339,9 @@ function App() {
             ) : coverLetter ? (
 
               <div className="cover-letter-content">
-                {/* Copy button only once
-                    streaming has finished */}
-
-                {!isStreaming && (
-                  <button
-                    className="copy-btn"
-                    onClick={
-                      handleCopy
-                    }
-                  >
-                    {copied
-                      ? "✓ Copied!"
-                      : "📋 Copy to Clipboard"}
-                  </button>
-                )}
 
                 {/* Markdown → HTML, re-parsed on every
-                    chunk so the letter renders live */}
+                    chunk so the letter renders lives in it */}
 
                 <div
                   dangerouslySetInnerHTML={{
@@ -395,7 +358,21 @@ function App() {
                   </span>
                 )}
 
-                
+                {/* Copy button only once
+                    streaming has finished */}
+
+                {!isStreaming && (
+                  <button
+                    className="copy-btn"
+                    onClick={
+                      handleCopy
+                    }
+                  >
+                    {copied
+                      ? "✓ Copied!"
+                      : "📋 Copy"}
+                  </button>
+                )}
 
               </div>
 
